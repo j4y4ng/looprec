@@ -1,0 +1,40 @@
+name: build
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install ldid
+        run: brew install ldid
+
+      - name: Build app and package ipa
+        run: |
+          set -euo pipefail
+          SDK="$(xcrun --sdk iphoneos --show-sdk-path)"
+          echo "SDK=$SDK"
+          xcrun --sdk iphoneos swiftc \
+            -sdk "$SDK" \
+            -target arm64-apple-ios15.0 \
+            -O \
+            main.swift \
+            -o LoopRec \
+            -framework UIKit \
+            -framework AVFoundation
+          mkdir -p Payload/LoopRec.app
+          cp LoopRec Info.plist Payload/LoopRec.app/
+          /opt/homebrew/bin/ldid -S Payload/LoopRec.app/LoopRec
+          zip -qry LoopRec.ipa Payload
+          ls -lh LoopRec.ipa
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: LoopRec-ipa
+          path: LoopRec.ipa
+          if-no-files-found: error
